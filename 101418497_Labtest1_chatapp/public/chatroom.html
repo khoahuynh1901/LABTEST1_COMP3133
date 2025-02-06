@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Room</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+        }
+
+        #chatContainer {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px;
+        }
+
+        .chatBox {
+            width: 45%;
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h2 {
+            color: #333;
+        }
+
+        #chatbox, #privateChatbox {
+            border: 1px solid #ddd;
+            height: 300px;
+            overflow-y: auto;
+            padding: 10px;
+            background: #f9f9f9;
+            border-radius: 5px;
+            text-align: left;
+        }
+
+        .chatBubble {
+            background: #007bff;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 15px;
+            margin: 5px;
+            display: inline-block;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+
+        .chatBubble.sender {
+            background: #28a745;
+            text-align: right;
+            float: right;
+        }
+
+        .inputArea {
+            margin-top: 10px;
+        }
+
+        input, button {
+            padding: 10px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+        }
+
+        input {
+            width: 70%;
+            border: 1px solid #ccc;
+        }
+
+        button {
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        .leaveBtn {
+            background: #dc3545;
+        }
+
+        .leaveBtn:hover {
+            background: #b02a37;
+        }
+    </style>
+</head>
+<body>
+    <div id="usernameSection">
+        <input type="text" id="username" placeholder="Enter your name">
+        <button onclick="setUsername()">Set Username</button>
+    </div>
+
+    <div id="chatSection" style="display:none;">
+        <h2>Chat Room</h2>
+        <p id="currentRoom"></p>
+        <button onclick="joinRoom('DevOps')">Join DevOps Room</button>
+        <button onclick="joinRoom('Cloud')">Join Cloud Room</button>
+        <button onclick="joinRoom('Sports')">Join Sports Room</button>
+        <button onclick="leaveRoom()" class="leaveBtn">Leave Room</button>
+
+        <div id="chatContainer">
+            <!-- Room Chat -->
+            <div class="chatBox">
+                <h3>Room Chat</h3>
+                <div id="chatbox"></div>
+                <div class="inputArea">
+                    <input type="text" id="message" placeholder="Type a message">
+                    <button onclick="sendMessage()">Send</button>
+                </div>
+            </div>
+
+            <!-- Private Chat -->
+            <div class="chatBox">
+                <h3>Private Chat</h3>
+                <div id="privateChatbox"></div>
+                <div class="inputArea">
+                    <input type="text" id="recipient" placeholder="Enter recipient name">
+                    <input type="text" id="privateMessage" placeholder="Enter private message">
+                    <button onclick="sendPrivateMessage()">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let username = '';
+
+        function setUsername() {
+            username = document.getElementById('username').value;
+            if (username) {
+                socket.emit('setUsername', username);
+                document.getElementById('usernameSection').style.display = 'none';
+                document.getElementById('chatSection').style.display = 'block';
+            }
+        }
+
+        function joinRoom(room) {
+            document.getElementById('chatbox').innerHTML = '';
+            socket.emit('joinRoom', { username, room });
+            document.getElementById('currentRoom').innerText = `Current Room: ${room}`;
+        }
+
+        function sendMessage() {
+            const message = document.getElementById('message').value;
+            if (message) {
+                socket.emit('chatMessage', { message, sender: username });
+                document.getElementById('message').value = '';
+            }
+        }
+
+        function leaveRoom() {
+            const room = document.getElementById('currentRoom').innerText.replace('Current Room: ', '');
+            socket.emit('leaveRoom', room);
+            document.getElementById('currentRoom').innerText = '';
+        }
+
+        function sendPrivateMessage() {
+            const recipient = document.getElementById('recipient').value;
+            const privateMessage = document.getElementById('privateMessage').value;
+            if (recipient && privateMessage) {
+                socket.emit('privateMessage', { sender: username, recipient, message: privateMessage });
+                document.getElementById('privateMessage').value = '';
+                displayMessage('privateChatbox', username, privateMessage, true);
+            }
+        }
+
+        function displayMessage(containerId, sender, message, isSender) {
+            const chatbox = document.getElementById(containerId);
+            const messageElement = document.createElement('p');
+            messageElement.classList.add('chatBubble');
+            if (isSender) messageElement.classList.add('sender');
+            messageElement.innerHTML = `<strong>${sender}:</strong> ${message}`;
+            chatbox.appendChild(messageElement);
+            chatbox.scrollTop = chatbox.scrollHeight;
+        }
+
+        socket.on('chatMessage', (data) => {
+            displayMessage('chatbox', data.sender, data.message, data.sender === username);
+        });
+
+        socket.on('privateMessage', (data) => {
+            displayMessage('privateChatbox', data.sender, data.message, false);
+        });
+
+        socket.on('loadMessages', (messages) => {
+            const chatbox = document.getElementById('chatbox');
+            chatbox.innerHTML = messages.map(msg => 
+                `<p class="chatBubble ${msg.sender === username ? 'sender' : ''}">
+                    <strong>${msg.sender}:</strong> ${msg.message}
+                </p>`
+            ).join('');
+        });
+    </script>
+</body>
+</html>
